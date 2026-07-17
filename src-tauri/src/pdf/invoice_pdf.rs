@@ -471,8 +471,8 @@ fn render_totals(
     line(ops, y, "Total", data.invoice.total_amount, true, DARK);
     y -= 6.5;
     line(ops, y, "Montant paye", data.invoice.amount_paid, false, GREY);
-    y -= 6.0;
-    draw_hline(ops, label_x, CONTENT_RIGHT, y + 2.5, 0.6, GREY);
+    y -= 8.5;
+    draw_hline(ops, label_x, CONTENT_RIGHT, y + 4.5, 0.6, GREY);
     let balance_color = if data.invoice.balance_due > 0.0 { (0.72, 0.11, 0.11) } else { (0.02, 0.47, 0.34) };
     line(ops, y, "Reste a payer", data.invoice.balance_due, true, balance_color);
     y -= 8.0;
@@ -560,7 +560,6 @@ fn render_footer(ops: &mut Vec<Op>, fonts: &InvoiceFonts, data: &InvoicePdfData)
         data.settings.full_name, data.settings.address, data.settings.phone, data.settings.email
     );
     draw_text(ops, &fonts.regular, MARGIN, 15.0, &footer_line, 7.5, GREY);
-    draw_text(ops, &fonts.regular, MARGIN, 11.5, "Document genere localement - aucune donnee transmise en ligne.", 7.0, GREY);
 }
 
 fn month_year_fr(month: i64, year: i64) -> String {
