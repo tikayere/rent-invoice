@@ -1,0 +1,94 @@
+name: Build iOS app
+
+# Builds a signed iOS .ipa and publishes it as a downloadable GitHub Release
+# asset. No App Store / TestFlight submission — this just produces an
+# installable build for direct download and sideloading (e.g. via Xcode's
+# Devices window, Apple Configurator, or a sideloading tool).
+#
+# Uses ad-hoc export, so the provisioning profile must list the UDIDs of
+# every device you want to install on (register devices at
+# developer.apple.com > Devices before generating the profile).
+#
+# Required repo configuration (Settings > Secrets and variables > Actions):
+#   Secrets (never expose these as plain "Variables" — they are credentials):
+#     IOS_CERTIFICATE            base64 of your exported "Apple Distribution"
+#                                 .p12 certificate
+#                                 (base64 -i Certificates.p12 | pbcopy)
+#     IOS_CERTIFICATE_PASSWORD   password used when exporting the .p12
+#     IOS_MOBILE_PROVISION       base64 of an Ad Hoc provisioning profile
+#                                 matching the app's bundle identifier
+#                                 (base64 -i Profile.mobileprovision | pbcopy)
+#
+# The Apple Developer Team ID is NOT a secret here — it's set directly in
+# src-tauri/tauri.conf.json under bundle.iOS.developmentTeam, so replace
+# "REPLACE_WITH_YOUR_APPLE_TEAM_ID" there with your real Team ID once.
+#
+# Trigger a release by pushing a tag (e.g. `git tag ios-v1.0.0 && git push --tags`),
+# or run manually from the Actions tab to only produce a downloadable
+# workflow artifact (no release).
+#
+# NOTE: the macOS desktop build (build-macos.yml) is on hold and only runs
+# manually for now — this workflow is the active one.
+
+on:
+  push:
+    tags:
+      - "ios-v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    env:
+      CI: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Initialize iOS Xcode project
+        run: npm run tauri ios init
+
+      - name: Build signed .ipa
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
+        run: npm run tauri ios build -- --export-method ad-hoc
+
+      - name: Upload .ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: src-tauri/gen/apple/build/arm64/*.ipa
+          if-no-files-found: warn
+
+      # Tag push only: attach the .ipa to a GitHub Release so it's
+      # permanently downloadable (workflow artifacts expire).
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: src-tauri/gen/apple/build/arm64/*.ipa

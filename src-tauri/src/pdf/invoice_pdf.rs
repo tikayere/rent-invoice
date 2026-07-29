@@ -3,9 +3,14 @@ use printpdf::*;
 use crate::models::{Invoice, Settings, Tenant};
 use crate::pdf::fonts::InvoiceFonts;
 
-const PAGE_WIDTH: f32 = 210.0;
-const PAGE_HEIGHT: f32 = 297.0;
-const MARGIN: f32 = 15.0;
+/// A5 keeps the exact aspect ratio of A4 (ISO 216: 1:sqrt(2)), so every mm/pt
+/// value in this file is the A4 design scaled down by this factor. This
+/// preserves the layout proportions exactly instead of re-deriving them.
+const SCALE: f32 = 0.7071;
+
+const PAGE_WIDTH: f32 = 148.0;
+const PAGE_HEIGHT: f32 = 210.0;
+const MARGIN: f32 = 15.0 * SCALE;
 const CONTENT_RIGHT: f32 = PAGE_WIDTH - MARGIN;
 
 const DARK: (f32, f32, f32) = (0.117, 0.161, 0.231); // slate-900
@@ -56,7 +61,7 @@ impl Palette {
         match template {
             InvoiceTemplate::Classic => Palette {
                 brand: (0.145, 0.388, 0.922), // #2563eb
-                header_rule_weight: 1.2,
+                header_rule_weight: 1.2 * SCALE,
                 table_header_bg: DARK,
                 table_header_fg: WHITE,
                 zebra: Some(LIGHT_GREY),
@@ -64,7 +69,7 @@ impl Palette {
             },
             InvoiceTemplate::Modern => Palette {
                 brand: (0.024, 0.467, 0.435), // #0c7768 teal
-                header_rule_weight: 2.6,
+                header_rule_weight: 2.6 * SCALE,
                 table_header_bg: (0.024, 0.467, 0.435),
                 table_header_fg: WHITE,
                 zebra: Some((0.902, 0.961, 0.949)), // teal-tinted slate-100
@@ -72,7 +77,7 @@ impl Palette {
             },
             InvoiceTemplate::Minimal => Palette {
                 brand: DARK, // monochrome: no accent colour
-                header_rule_weight: 0.5,
+                header_rule_weight: 0.5 * SCALE,
                 table_header_bg: WHITE,
                 table_header_fg: DARK,
                 zebra: None,
@@ -91,7 +96,7 @@ pub struct InvoicePdfData<'a> {
     pub invoice: &'a Invoice,
 }
 
-/// Renders a complete, printable A4 rent invoice and returns the raw PDF bytes.
+/// Renders a complete, printable A5 rent invoice and returns the raw PDF bytes.
 pub fn render_invoice_pdf(data: &InvoicePdfData) -> Result<Vec<u8>, String> {
     let mut doc = PdfDocument::new(&format!("Facture {}", data.invoice.invoice_number));
     let fonts = InvoiceFonts::load(&mut doc)?;
@@ -284,7 +289,7 @@ fn render_header(
         if let Ok(bytes) = std::fs::read(logo_path) {
             let mut warnings = Vec::new();
             if let Ok(image) = RawImage::decode_from_bytes(&bytes, &mut warnings) {
-                let target_width_mm: f32 = 32.0;
+                let target_width_mm: f32 = 32.0 * SCALE;
                 let dpi = if image.width > 0 {
                     (image.width as f32) * 25.4 / target_width_mm
                 } else {
@@ -293,7 +298,7 @@ fn render_header(
                 let height_mm = if image.width > 0 {
                     (image.height as f32) * target_width_mm / (image.width as f32)
                 } else {
-                    20.0
+                    20.0 * SCALE
                 };
                 let image_id = doc.add_image(&image);
                 let translate_y = top - height_mm;
@@ -315,30 +320,30 @@ fn render_header(
 
     // Bailleur information block, right-aligned column starting at the
     // horizontal midpoint of the page.
-    let info_x = PAGE_WIDTH / 2.0 + 5.0;
+    let info_x = PAGE_WIDTH / 2.0 + 5.0 * SCALE;
     let mut y = top;
-    draw_text(ops, &fonts.bold, info_x, y, &data.settings.full_name, 13.0, DARK);
-    y -= 5.5;
+    draw_text(ops, &fonts.bold, info_x, y, &data.settings.full_name, 13.0 * SCALE, DARK);
+    y -= 5.5 * SCALE;
     if let Some(company) = data.settings.company_name.as_deref().filter(|s| !s.is_empty()) {
-        draw_text(ops, &fonts.regular, info_x, y, company, 9.5, GREY);
-        y -= 4.6;
+        draw_text(ops, &fonts.regular, info_x, y, company, 9.5 * SCALE, GREY);
+        y -= 4.6 * SCALE;
     }
-    y = draw_wrapped_text(ops, &fonts.regular, info_x, y, CONTENT_RIGHT - info_x, &data.settings.address, 9.5, GREY);
+    y = draw_wrapped_text(ops, &fonts.regular, info_x, y, CONTENT_RIGHT - info_x, &data.settings.address, 9.5 * SCALE, GREY);
     let contact_line = format!("{}, {}", data.settings.city, data.settings.country);
-    draw_text(ops, &fonts.regular, info_x, y, &contact_line, 9.5, GREY);
-    y -= 4.6;
+    draw_text(ops, &fonts.regular, info_x, y, &contact_line, 9.5 * SCALE, GREY);
+    y -= 4.6 * SCALE;
     let phone_email = format!("{}  -  {}", data.settings.phone, data.settings.email);
-    draw_text(ops, &fonts.regular, info_x, y, &phone_email, 9.5, GREY);
-    y -= 4.6;
+    draw_text(ops, &fonts.regular, info_x, y, &phone_email, 9.5 * SCALE, GREY);
+    y -= 4.6 * SCALE;
     if let Some(tax) = data.settings.tax_number.as_deref().filter(|s| !s.is_empty()) {
-        draw_text(ops, &fonts.regular, info_x, y, &format!("N. fiscal : {}", tax), 9.0, GREY);
-        y -= 4.4;
+        draw_text(ops, &fonts.regular, info_x, y, &format!("N. fiscal : {}", tax), 9.0 * SCALE, GREY);
+        y -= 4.4 * SCALE;
     }
 
-    let bottom = logo_bottom.min(y).min(top - 26.0);
-    cursor.y = bottom - 6.0;
+    let bottom = logo_bottom.min(y).min(top - 26.0 * SCALE);
+    cursor.y = bottom - 6.0 * SCALE;
     draw_hline(ops, MARGIN, CONTENT_RIGHT, cursor.y, palette.header_rule_weight, palette.brand);
-    cursor.y -= 10.0;
+    cursor.y -= 10.0 * SCALE;
 }
 
 fn render_title_and_meta(
@@ -348,20 +353,20 @@ fn render_title_and_meta(
     cursor: &mut PdfCursor,
     palette: &Palette,
 ) {
-    draw_text(ops, &fonts.bold, MARGIN, cursor.y, "FACTURE DE LOYER", 19.0, palette.brand);
+    draw_text(ops, &fonts.bold, MARGIN, cursor.y, "FACTURE DE LOYER", 19.0 * SCALE, palette.brand);
 
-    let meta_x = PAGE_WIDTH / 2.0 + 15.0;
-    let mut y = cursor.y + 1.5;
-    draw_text(ops, &fonts.regular, meta_x, y, "Numero de facture", 8.5, GREY);
-    draw_text(ops, &fonts.bold, meta_x + 32.0, y, &data.invoice.invoice_number, 10.0, DARK);
-    y -= 5.5;
-    draw_text(ops, &fonts.regular, meta_x, y, "Date d'emission", 8.5, GREY);
-    draw_text(ops, &fonts.regular, meta_x + 32.0, y, &data.invoice.issue_date, 9.5, DARK);
-    y -= 5.5;
-    draw_text(ops, &fonts.regular, meta_x, y, "Date d'echeance", 8.5, GREY);
-    draw_text(ops, &fonts.regular, meta_x + 32.0, y, &data.invoice.due_date, 9.5, DARK);
+    let meta_x = PAGE_WIDTH / 2.0 + 15.0 * SCALE;
+    let mut y = cursor.y + 1.5 * SCALE;
+    draw_text(ops, &fonts.regular, meta_x, y, "Numero de facture", 8.5 * SCALE, GREY);
+    draw_text(ops, &fonts.bold, meta_x + 32.0 * SCALE, y, &data.invoice.invoice_number, 10.0 * SCALE, DARK);
+    y -= 5.5 * SCALE;
+    draw_text(ops, &fonts.regular, meta_x, y, "Date d'emission", 8.5 * SCALE, GREY);
+    draw_text(ops, &fonts.regular, meta_x + 32.0 * SCALE, y, &data.invoice.issue_date, 9.5 * SCALE, DARK);
+    y -= 5.5 * SCALE;
+    draw_text(ops, &fonts.regular, meta_x, y, "Date d'echeance", 8.5 * SCALE, GREY);
+    draw_text(ops, &fonts.regular, meta_x + 32.0 * SCALE, y, &data.invoice.due_date, 9.5 * SCALE, DARK);
 
-    cursor.y -= 14.0;
+    cursor.y -= 14.0 * SCALE;
 }
 
 fn render_tenant_and_property(
@@ -371,32 +376,32 @@ fn render_tenant_and_property(
     cursor: &mut PdfCursor,
 ) {
     let top = cursor.y;
-    draw_text(ops, &fonts.bold, MARGIN, top, "FACTURE A", 9.5, GREY);
+    draw_text(ops, &fonts.bold, MARGIN, top, "FACTURE A", 9.5 * SCALE, GREY);
     let tenant_name = format!("{} {}", data.tenant.first_name, data.tenant.last_name);
-    let mut y = top - 5.5;
-    draw_text(ops, &fonts.bold, MARGIN, y, &tenant_name, 11.5, DARK);
-    y -= 5.2;
-    y = draw_wrapped_text(ops, &fonts.regular, MARGIN, y, 80.0, &data.tenant.address, 9.5, GREY);
-    draw_text(ops, &fonts.regular, MARGIN, y, &data.tenant.phone, 9.5, GREY);
-    y -= 4.6;
+    let mut y = top - 5.5 * SCALE;
+    draw_text(ops, &fonts.bold, MARGIN, y, &tenant_name, 11.5 * SCALE, DARK);
+    y -= 5.2 * SCALE;
+    y = draw_wrapped_text(ops, &fonts.regular, MARGIN, y, 80.0 * SCALE, &data.tenant.address, 9.5 * SCALE, GREY);
+    draw_text(ops, &fonts.regular, MARGIN, y, &data.tenant.phone, 9.5 * SCALE, GREY);
+    y -= 4.6 * SCALE;
     if let Some(email) = data.tenant.email.as_deref().filter(|s| !s.is_empty()) {
-        draw_text(ops, &fonts.regular, MARGIN, y, email, 9.5, GREY);
-        y -= 4.6;
+        draw_text(ops, &fonts.regular, MARGIN, y, email, 9.5 * SCALE, GREY);
+        y -= 4.6 * SCALE;
     }
 
-    let right_x = PAGE_WIDTH / 2.0 + 15.0;
+    let right_x = PAGE_WIDTH / 2.0 + 15.0 * SCALE;
     let mut ry = top;
-    draw_text(ops, &fonts.bold, right_x, ry, "BIEN LOUE", 9.5, GREY);
-    ry -= 5.5;
-    ry = draw_wrapped_text(ops, &fonts.regular, right_x, ry, CONTENT_RIGHT - right_x, &data.invoice.property_address, 9.5, DARK);
+    draw_text(ops, &fonts.bold, right_x, ry, "BIEN LOUE", 9.5 * SCALE, GREY);
+    ry -= 5.5 * SCALE;
+    ry = draw_wrapped_text(ops, &fonts.regular, right_x, ry, CONTENT_RIGHT - right_x, &data.invoice.property_address, 9.5 * SCALE, DARK);
     let period = format!("Periode : {}", month_year_fr(data.invoice.billing_month, data.invoice.billing_year));
-    draw_text(ops, &fonts.regular, right_x, ry, &period, 9.5, GREY);
-    ry -= 4.6;
+    draw_text(ops, &fonts.regular, right_x, ry, &period, 9.5 * SCALE, GREY);
+    ry -= 4.6 * SCALE;
     if let Some(desc) = data.invoice.description.as_deref().filter(|s| !s.is_empty()) {
-        draw_wrapped_text(ops, &fonts.regular, right_x, ry, CONTENT_RIGHT - right_x, desc, 9.0, GREY);
+        draw_wrapped_text(ops, &fonts.regular, right_x, ry, CONTENT_RIGHT - right_x, desc, 9.0 * SCALE, GREY);
     }
 
-    cursor.y = y.min(ry) - 8.0;
+    cursor.y = y.min(ry) - 8.0 * SCALE;
 }
 
 fn render_charges_table(
@@ -408,15 +413,15 @@ fn render_charges_table(
 ) {
     let currency = &data.settings.currency;
     let table_top = cursor.y;
-    let row_h = 8.0;
-    let header_h = 9.0;
-    let col_amount_x = CONTENT_RIGHT - 5.0;
+    let row_h = 8.0 * SCALE;
+    let header_h = 9.0 * SCALE;
+    let col_amount_x = CONTENT_RIGHT - 5.0 * SCALE;
 
     draw_filled_rect(ops, MARGIN, table_top - header_h, CONTENT_RIGHT - MARGIN, header_h, palette.table_header_bg);
-    draw_text(ops, &fonts.bold, MARGIN + 3.0, table_top - header_h + 2.8, "DESCRIPTION", 9.5, palette.table_header_fg);
-    draw_text(ops, &fonts.bold, col_amount_x - 22.0, table_top - header_h + 2.8, "MONTANT", 9.5, palette.table_header_fg);
+    draw_text(ops, &fonts.bold, MARGIN + 3.0 * SCALE, table_top - header_h + 2.8 * SCALE, "DESCRIPTION", 9.5 * SCALE, palette.table_header_fg);
+    draw_text(ops, &fonts.bold, col_amount_x - 22.0 * SCALE, table_top - header_h + 2.8 * SCALE, "MONTANT", 9.5 * SCALE, palette.table_header_fg);
     if palette.table_header_border {
-        draw_hline(ops, MARGIN, CONTENT_RIGHT, table_top - header_h, 0.5, GREY);
+        draw_hline(ops, MARGIN, CONTENT_RIGHT, table_top - header_h, 0.5 * SCALE, GREY);
     }
 
     let mut y = table_top - header_h;
@@ -440,13 +445,13 @@ fn render_charges_table(
                 draw_filled_rect(ops, MARGIN, y, CONTENT_RIGHT - MARGIN, row_h, zebra);
             }
         }
-        draw_text(ops, &fonts.regular, MARGIN + 3.0, y + 2.6, label, 9.5, DARK);
+        draw_text(ops, &fonts.regular, MARGIN + 3.0 * SCALE, y + 2.6 * SCALE, label, 9.5 * SCALE, DARK);
         let amount_str = money(*amount, currency);
-        draw_text(ops, &fonts.regular, col_amount_x - (amount_str.len() as f32 * 1.7), y + 2.6, &amount_str, 9.5, DARK);
+        draw_text(ops, &fonts.regular, col_amount_x - (amount_str.len() as f32 * 1.7 * SCALE), y + 2.6 * SCALE, &amount_str, 9.5 * SCALE, DARK);
     }
 
-    draw_hline(ops, MARGIN, CONTENT_RIGHT, y, 0.6, GREY);
-    cursor.y = y - 6.0;
+    draw_hline(ops, MARGIN, CONTENT_RIGHT, y, 0.6 * SCALE, GREY);
+    cursor.y = y - 6.0 * SCALE;
 }
 
 fn render_totals(
@@ -456,26 +461,26 @@ fn render_totals(
     cursor: &mut PdfCursor,
 ) {
     let currency = &data.settings.currency;
-    let label_x = PAGE_WIDTH / 2.0 + 20.0;
-    let value_x = CONTENT_RIGHT - 5.0;
+    let label_x = PAGE_WIDTH / 2.0 + 20.0 * SCALE;
+    let value_x = CONTENT_RIGHT - 5.0 * SCALE;
     let mut y = cursor.y;
 
     let line = |ops: &mut Vec<Op>, y: f32, label: &str, amount: f64, bold: bool, color: (f32, f32, f32)| {
         let font = if bold { &fonts.bold } else { &fonts.regular };
-        draw_text(ops, font, label_x, y, label, if bold { 11.0 } else { 9.5 }, color);
+        let size = if bold { 11.0 * SCALE } else { 9.5 * SCALE };
+        draw_text(ops, font, label_x, y, label, size, color);
         let amount_str = money(amount, currency);
-        let size = if bold { 11.0 } else { 9.5 };
         draw_text(ops, font, value_x - (amount_str.len() as f32 * (size * 0.19)), y, &amount_str, size, color);
     };
 
     line(ops, y, "Total", data.invoice.total_amount, true, DARK);
-    y -= 6.5;
+    y -= 6.5 * SCALE;
     line(ops, y, "Montant paye", data.invoice.amount_paid, false, GREY);
-    y -= 8.5;
-    draw_hline(ops, label_x, CONTENT_RIGHT, y + 4.5, 0.6, GREY);
+    y -= 8.5 * SCALE;
+    draw_hline(ops, label_x, CONTENT_RIGHT, y + 4.5 * SCALE, 0.6 * SCALE, GREY);
     let balance_color = if data.invoice.balance_due > 0.0 { (0.72, 0.11, 0.11) } else { (0.02, 0.47, 0.34) };
     line(ops, y, "Reste a payer", data.invoice.balance_due, true, balance_color);
-    y -= 8.0;
+    y -= 8.0 * SCALE;
 
     cursor.y = y;
 }
@@ -489,36 +494,36 @@ fn render_payment_info(
     let mut y = cursor.y;
     let method = payment_method_fr(&data.invoice.payment_method);
     let status = status_fr(&data.invoice.status);
-    draw_text(ops, &fonts.regular, MARGIN, y, &format!("Mode de paiement : {}", method), 9.5, DARK);
-    draw_text(ops, &fonts.bold, PAGE_WIDTH / 2.0 + 20.0, y, &format!("Statut : {}", status), 9.5, DARK);
-    y -= 6.5;
+    draw_text(ops, &fonts.regular, MARGIN, y, &format!("Mode de paiement : {}", method), 9.5 * SCALE, DARK);
+    draw_text(ops, &fonts.bold, PAGE_WIDTH / 2.0 + 20.0 * SCALE, y, &format!("Statut : {}", status), 9.5 * SCALE, DARK);
+    y -= 6.5 * SCALE;
 
     if let Some(iban) = data.settings.iban.as_deref().filter(|s| !s.is_empty()) {
-        draw_text(ops, &fonts.regular, MARGIN, y, &format!("IBAN : {}", iban), 9.0, GREY);
-        y -= 5.5;
+        draw_text(ops, &fonts.regular, MARGIN, y, &format!("IBAN : {}", iban), 9.0 * SCALE, GREY);
+        y -= 5.5 * SCALE;
     }
 
     if let Some(obs) = data.invoice.observations.as_deref().filter(|s| !s.is_empty()) {
-        draw_text(ops, &fonts.regular, MARGIN, y, "Observations :", 8.5, GREY);
-        y -= 4.6;
-        y = draw_wrapped_text(ops, &fonts.regular, MARGIN, y, CONTENT_RIGHT - MARGIN, obs, 9.0, GREY);
+        draw_text(ops, &fonts.regular, MARGIN, y, "Observations :", 8.5 * SCALE, GREY);
+        y -= 4.6 * SCALE;
+        y = draw_wrapped_text(ops, &fonts.regular, MARGIN, y, CONTENT_RIGHT - MARGIN, obs, 9.0 * SCALE, GREY);
     }
 
     cursor.y = y;
 }
 
 fn render_signature(ops: &mut Vec<Op>, doc: &mut PdfDocument, fonts: &InvoiceFonts, data: &InvoicePdfData) {
-    let block_x = CONTENT_RIGHT - 55.0;
-    let mut y = 55.0;
+    let block_x = CONTENT_RIGHT - 55.0 * SCALE;
+    let mut y = 55.0 * SCALE;
 
-    draw_text(ops, &fonts.regular, block_x, y, "Signature du bailleur", 9.0, GREY);
-    y -= 4.0;
+    draw_text(ops, &fonts.regular, block_x, y, "Signature du bailleur", 9.0 * SCALE, GREY);
+    y -= 4.0 * SCALE;
 
     if let Some(sig_path) = data.settings.signature_path.as_deref() {
         if let Ok(bytes) = std::fs::read(sig_path) {
             let mut warnings = Vec::new();
             if let Ok(image) = RawImage::decode_from_bytes(&bytes, &mut warnings) {
-                let target_width_mm: f32 = 40.0;
+                let target_width_mm: f32 = 40.0 * SCALE;
                 let dpi = if image.width > 0 {
                     (image.width as f32) * 25.4 / target_width_mm
                 } else {
@@ -527,7 +532,7 @@ fn render_signature(ops: &mut Vec<Op>, doc: &mut PdfDocument, fonts: &InvoiceFon
                 let height_mm = if image.width > 0 {
                     (image.height as f32) * target_width_mm / (image.width as f32)
                 } else {
-                    15.0
+                    15.0 * SCALE
                 };
                 let image_id = doc.add_image(&image);
                 ops.push(Op::UseXobject {
@@ -541,25 +546,25 @@ fn render_signature(ops: &mut Vec<Op>, doc: &mut PdfDocument, fonts: &InvoiceFon
                         dpi: Some(dpi),
                     },
                 });
-                y -= height_mm + 2.0;
+                y -= height_mm + 2.0 * SCALE;
             }
         }
     } else {
-        y -= 14.0;
+        y -= 14.0 * SCALE;
     }
 
-    draw_hline(ops, block_x, CONTENT_RIGHT, y, 0.5, GREY);
+    draw_hline(ops, block_x, CONTENT_RIGHT, y, 0.5 * SCALE, GREY);
     let today = data.invoice.issue_date.clone();
-    draw_text(ops, &fonts.regular, block_x, y - 4.5, &format!("Fait le {}", today), 8.5, GREY);
+    draw_text(ops, &fonts.regular, block_x, y - 4.5 * SCALE, &format!("Fait le {}", today), 8.5 * SCALE, GREY);
 }
 
 fn render_footer(ops: &mut Vec<Op>, fonts: &InvoiceFonts, data: &InvoicePdfData) {
-    draw_hline(ops, MARGIN, CONTENT_RIGHT, 20.0, 0.4, LIGHT_GREY);
+    draw_hline(ops, MARGIN, CONTENT_RIGHT, 20.0 * SCALE, 0.4 * SCALE, LIGHT_GREY);
     let footer_line = format!(
         "{}  -  {}  -  {}  -  {}",
         data.settings.full_name, data.settings.address, data.settings.phone, data.settings.email
     );
-    draw_text(ops, &fonts.regular, MARGIN, 15.0, &footer_line, 7.5, GREY);
+    draw_text(ops, &fonts.regular, MARGIN, 15.0 * SCALE, &footer_line, 7.5 * SCALE, GREY);
 }
 
 fn month_year_fr(month: i64, year: i64) -> String {

@@ -1,0 +1,106 @@
+name: Build macOS app
+
+# ON HOLD: this workflow is not maintained for now — only build-ios.yml is.
+# It lives outside .github/workflows/ on purpose, so GitHub Actions does not
+# pick it up at all (not listed in the Actions tab, cannot be run manually
+# or by tag push). To resume macOS builds later, move this file back to
+# .github/workflows/build-macos.yml and, if you also want tag-triggered
+# releases again, uncomment the `push.tags` block below.
+#
+# Builds a signed, notarized, universal (Intel + Apple Silicon) macOS build
+# of the app so it opens on any MacBook without a Gatekeeper warning.
+#
+# Required repo configuration (Settings > Secrets and variables > Actions):
+#   Secrets (never expose these as plain "Variables" — they are credentials):
+#     APPLE_CERTIFICATE            base64 of your exported "Developer ID
+#                                   Application" .p12 certificate
+#                                   (base64 -i Certificates.p12 | pbcopy)
+#     APPLE_CERTIFICATE_PASSWORD   password used when exporting the .p12
+#     APPLE_SIGNING_IDENTITY       e.g. "Developer ID Application: Jane Doe (ABCDE12345)"
+#     APPLE_ID                     Apple ID email used for notarization
+#     APPLE_PASSWORD               app-specific password from appleid.apple.com
+#                                   (Security > App-Specific Passwords)
+#     APPLE_TEAM_ID                10-character Apple Developer Team ID
+#   GITHUB_TOKEN is provided automatically by Actions; no setup needed.
+#
+# While on hold: run manually from the Actions tab for an unsigned-release
+# test build. To resume tag-triggered releases, uncomment the block below.
+
+on:
+  # push:
+  #   tags:
+  #     - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # Tag push: build, sign, notarize, and publish a draft GitHub release
+      # with the .dmg attached.
+      - name: Build, sign, notarize and publish release
+        if: github.ref_type == 'tag'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Gestion des Loyers v__VERSION__"
+          releaseBody: "Voir les notes de version ci-dessous."
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: false
+          args: --target universal-apple-darwin
+
+      # Manual run (workflow_dispatch): same signed + notarized build, but
+      # skip release publishing — just produce an artifact to download.
+      - name: Build and notarize (test build)
+        if: github.ref_type != 'tag'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run tauri build -- --target universal-apple-darwin
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
+          if-no-files-found: warn
