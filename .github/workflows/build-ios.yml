@@ -5,7 +5,8 @@ name: Build iOS app
 # installable build for direct download and sideloading (e.g. via Xcode's
 # Devices window, Apple Configurator, or a sideloading tool).
 #
-# Uses ad-hoc export, so the provisioning profile must list the UDIDs of
+# Uses Tauri's "release-testing" export method (its equivalent of Apple's
+# ad-hoc distribution), so the provisioning profile must list the UDIDs of
 # every device you want to install on (register devices at
 # developer.apple.com > Devices before generating the profile).
 #
@@ -75,7 +76,7 @@ jobs:
           IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
           IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
-        run: npm run tauri ios build -- --export-method ad-hoc
+        run: npm run tauri ios build -- --export-method release-testing
 
       - name: Upload .ipa artifact
         uses: actions/upload-artifact@v4
