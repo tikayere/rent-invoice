@@ -1,5 +1,14 @@
 name: Build iOS app
 
+# ON HOLD: this workflow is not used for now. iOS builds are done locally on
+# a Mac instead (see the "Compiler pour iOS" section in README.md) — cloning
+# the repo and building straight from Xcode avoids needing a distribution
+# certificate, provisioning profile, or any signing secrets in CI at all.
+# It lives outside .github/workflows/ on purpose, so GitHub Actions does not
+# pick it up (not listed in the Actions tab, cannot run manually or by tag
+# push). To resume CI builds later, move this file back to
+# .github/workflows/build-ios.yml.
+#
 # Builds a signed iOS .ipa and publishes it as a downloadable GitHub Release
 # asset. No App Store / TestFlight submission — this just produces an
 # installable build for direct download and sideloading (e.g. via Xcode's
@@ -27,9 +36,6 @@ name: Build iOS app
 # Trigger a release by pushing a tag (e.g. `git tag ios-v1.0.0 && git push --tags`),
 # or run manually from the Actions tab to only produce a downloadable
 # workflow artifact (no release).
-#
-# NOTE: the macOS desktop build (build-macos.yml) is on hold and only runs
-# manually for now — this workflow is the active one.
 
 on:
   push:

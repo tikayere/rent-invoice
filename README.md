@@ -60,6 +60,70 @@ Cela genere, selon la plateforme :
 - Linux : `.deb` et `.AppImage`
 - macOS : `.app` et `.dmg`
 
+## Compiler pour iOS (localement, sur un Mac)
+
+La compilation iOS se fait en local sur un Mac plutot que via une CI : cela
+evite d'avoir a gerer un certificat de distribution, un profil de
+provisioning ou des cles API — Xcode gere la signature automatiquement avec
+votre Apple ID. (Le workflow GitHub Actions correspondant existe toujours
+dans `.github/workflows-on-hold/build-ios.yml` mais est en pause ; il peut
+etre reactive plus tard si besoin de distribuer sans repasser par un Mac a
+chaque fois.)
+
+### Prerequis (sur le Mac)
+
+1. **Xcode** (App Store), puis les outils en ligne de commande :
+   ```bash
+   xcode-select --install
+   ```
+2. Dans Xcode : **Settings > Accounts**, connectez-vous avec un Apple ID.
+   Un compte gratuit suffit pour installer l'app sur vos propres
+   iPhone/iPad ; un compte payant (Apple Developer Program, 99$/an) n'est
+   necessaire que pour TestFlight/l'App Store.
+3. **Node.js** 18+ (`brew install node` ou [nodejs.org](https://nodejs.org))
+4. **Rust** + cibles iOS :
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+   ```
+
+### Etapes
+
+1. Cloner le depot et installer les dependances :
+   ```bash
+   git clone <url-du-depot>
+   cd rent-invoice
+   npm install
+   ```
+2. Initialiser le projet Xcode :
+   ```bash
+   npm run tauri ios init
+   ```
+3. Deux options pour lancer l'app sur un iPhone/iPad connecte en USB :
+   - **Test rapide avec hot-reload** :
+     ```bash
+     npm run tauri ios dev
+     ```
+     La premiere fois, Tauri ouvre Xcode : dans l'onglet
+     **Signing & Capabilities** du target `rent-invoice-manager_iOS`,
+     selectionnez votre Team (votre "Personal Team" si compte gratuit) avec
+     **Automatically manage signing** coche, puis relancez la commande.
+   - **Build et installation manuelle depuis Xcode** :
+     ```bash
+     npm run tauri ios build -- --open
+     ```
+     Cela ouvre le projet dans Xcode : choisissez votre appareil comme
+     destination (en haut, a cote du bouton Run), verifiez la Team dans
+     Signing & Capabilities, puis **Product > Run** (Cmd+R) pour compiler et
+     installer directement sur l'appareil.
+4. A la premiere installation, faire confiance au profil de developpeur sur
+   l'iPhone : **Reglages > General > VPN et gestion de l'appareil >
+   \[votre Apple ID\] > Faire confiance**.
+
+> Avec un compte Apple Developer gratuit, l'app installee expire au bout de
+> 7 jours (relancez simplement Run depuis Xcode pour la reinstaller). Avec
+> un compte payant, les builds signes durent 1 an.
+
 ## Structure du projet
 
 ```
