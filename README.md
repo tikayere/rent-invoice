@@ -60,6 +60,50 @@ Cela genere, selon la plateforme :
 - Linux : `.deb` et `.AppImage`
 - macOS : `.app` et `.dmg`
 
+## Compiler pour macOS (localement, sur un Mac)
+
+Le build desktop macOS suit le meme principe que ci-dessus
+(`npm run tauri build`), avec quelques particularites propres a macOS
+detaillees ici : produire un binaire universel (Intel + Apple Silicon) et
+contourner l'avertissement Gatekeeper puisque l'app n'est pas signee par un
+certificat Apple Developer payant. (Un workflow CI signe et notarise existe
+dans `.github/workflows-on-hold/build-macos.yml`, en pause pour l'instant —
+a reactiver plus tard si vous voulez distribuer sans avertissement et sans
+repasser par un Mac a chaque fois.)
+
+### Prerequis (sur le Mac)
+
+Node.js et Rust comme decrit dans la section [Prerequis](#prerequis)
+ci-dessus, plus les deux cibles Rust pour produire un binaire universel :
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+```
+
+### Etapes
+
+1. Cloner le depot et installer les dependances :
+   ```bash
+   git clone <url-du-depot>
+   cd rent-invoice
+   npm install
+   ```
+2. Compiler en binaire universel (fonctionne aussi bien sur Mac Intel
+   qu'Apple Silicon) :
+   ```bash
+   npm run tauri build -- --target universal-apple-darwin
+   ```
+   Le `.app` et le `.dmg` sont generes dans
+   `src-tauri/target/universal-apple-darwin/release/bundle/`. Pour un build
+   plus rapide limite a l'architecture de la machine courante, omettez
+   `--target universal-apple-darwin` (build alors dans
+   `src-tauri/target/release/bundle/`).
+3. A la premiere ouverture, macOS affiche un avertissement "developpeur non
+   identifie" (l'app n'est pas signee/notarisee). Pour l'ouvrir malgre tout :
+   **clic droit sur l'app > Ouvrir > confirmer "Ouvrir"** dans la boite de
+   dialogue (une seule fois ; les lancements suivants se font normalement en
+   double-cliquant).
+
 ## Compiler pour iOS (localement, sur un Mac)
 
 La compilation iOS se fait en local sur un Mac plutot que via une CI : cela
